@@ -1,7 +1,8 @@
 # Taller-02-AREP
 
-## Gestor de Tareas - Servidor Web en Java
+## Gestor de Tareas - Framework Web Ligero en Java
 
+## 📖 Descripción
 Este proyecto consiste en un framework web ligero desarrollado en Java, diseñado para facilitar la creación de aplicaciones web que integren servicios REST y la gestión de archivos estáticos (HTML, CSS, JavaScript, imágenes, entre otros).
 
 El framework ofrece:
