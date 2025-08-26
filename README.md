@@ -128,7 +128,7 @@ README.md                       # Documentación del proyecto
  
  ![imagenes](/imagenes/prueba1.png)
 
-![imagenes](/imagenes/prueba2.png)
+
 
 ## APP
 
