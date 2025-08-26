@@ -31,7 +31,7 @@ El framework ofrece:
  
  👉 http://localhost:8080
 
- ## Características Principales
+ ## ✨Características Principales
 
  - Servidor HTTP en Java puro: desarrollado sin frameworks externos, usando únicamente ServerSocket.
  
@@ -75,7 +75,54 @@ El sistema está compuesto por dos capas principales:
 
 - script.js: comunicación con el servidor usando fetch() (asíncrono).
 
-- La lista de tareas se actualiza dinámicamente en la página.
+- La lista de tareas se actualiza dinámicamente en la página. 
+
+## 🖥️ Ejemplo de uso del framework con Lambda
+1. Codigo
+```java
+        public static void main(String[] args) throws Exception {
+    staticfiles("src/main/webapp");
+
+    get("/App/hello", (req,res) -> "Hello " + req.getValues("name"));
+    get("/App/pi", (req,res) -> String.valueOf(Math.PI));
+
+    start(8080);
+} 
+```
+
+2. Http respuestas
+- GET `/App/hello?name=Juan`:
+   - Respuesta: `Hello Juan`
+- GET `/App/pi`:
+    - Respuesta: `3.141592653589793`     
+- GET `/tasks`:
+    - Respuesta:`[{"name":"jugar","type":"casa"}]` 
+
+## Estructura 
+```
+src/
+  main/
+    java/
+      eci/
+        arep/
+         juancancelado/ 
+            mavenproject1/
+            HttpServer.java       # Clase principal del servidor
+            Request.java          # Maneja las solicitudes HTTP
+            Response.java         # Maneja las respuestas HTTP
+            Route.java/           # interfaz
+    webroot/                    # Carpeta de archivos estáticos             
+        index.html              # Archivo HTML
+        styles.css              # Archivo CSS
+        script.js               # Archivo JavaScript
+        fondo.png               # Fondo de el html
+
+  test/
+    java/                       # Pruebas unitarias
+pom.xml                         # Archivo de configuración de Maven
+README.md                       # Documentación del proyecto
+
+```
 
 ## Pruebas
  
