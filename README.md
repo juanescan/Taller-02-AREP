@@ -1,15 +1,14 @@
-# Taller-01-AREP
+# Taller-02-AREP
 
 ## Gestor de Tareas - Servidor Web en Java
 
-Este proyecto implementa un servidor web en Java puro (sin frameworks) que soporta múltiples solicitudes seguidas no concurrentes.
-El servidor es capaz de leer archivos desde disco (HTML, CSS, JS, imágenes) y exponer una aplicación web de gestión de tareas con comunicación asíncrona vía servicios REST.
+Este proyecto consiste en un framework web ligero desarrollado en Java, diseñado para facilitar la creación de aplicaciones web que integren servicios REST y la gestión de archivos estáticos (HTML, CSS, JavaScript, imágenes, entre otros).
 
-La aplicación permite:
+El framework ofrece:
 
-- Agregar tareas con nombre y tipo (casa, universidad, trabajo, otro).
+- Mecanismos sencillos para definir rutas REST mediante funciones lambda.
 
-- Listar tareas en la interfaz.
+- Configuración flexible para establecer la ubicación de los archivos estáticos que el servidor expone
 
 - Eliminar tareas con un clic.
 

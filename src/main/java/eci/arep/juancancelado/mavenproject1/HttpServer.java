@@ -5,130 +5,152 @@ import java.net.*;
 import java.nio.file.Files;
 import java.util.*;
 import com.google.gson.Gson; // Usa Gson (añádelo a tu pom.xml si usas Maven)
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class HttpServer {
 
     private static final List<Map<String, String>> tasks = new ArrayList<>();
     private static final Gson gson = new Gson();
-
-    public static void main(String[] args) throws IOException {
-        int port = 8080;
-        ServerSocket serverSocket = new ServerSocket(port);
-        System.out.println("Servidor iniciado en puerto " + port);
-
+    private static final Map<String, Route> getRoutes = new ConcurrentHashMap<>();
+    private static String staticDir = "src/main/webapp";
+    
+     public static void staticfiles(String dir) {
+    staticDir = dir;
+    }
+       public static void get(String path, Route route) {
+        if (!path.startsWith("/")) path = "/" + path;
+        getRoutes.put(path, route);
+    }
+       
+      public static void start(int port) throws IOException {
+        ServerSocket server = new ServerSocket(port);
+        System.out.println("Servidor en http://localhost:" + port);
         while (true) {
-            try (Socket clientSocket = serverSocket.accept()) {
-                handleClient(clientSocket);
-            }
+            Socket client = server.accept();
+            new Thread(() -> {
+                try { handle(client); } catch(Exception ignored) {}
+                finally { try { client.close(); } catch(IOException ignored){} }
+            }).start();
         }
     }
 
-    private static void handleClient(Socket clientSocket) throws IOException {
-        BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-        OutputStream out = clientSocket.getOutputStream();
+    public static void main(String[] args) throws Exception {
+    staticfiles("src/main/webapp");
 
-        String inputLine = in.readLine();
-        if (inputLine == null || inputLine.isEmpty()) {
+    get("/App/hello", (req,res) -> "Hello " + req.getValues("name"));
+    get("/App/pi", (req,res) -> String.valueOf(Math.PI));
+
+    start(8080);
+}
+
+
+     private static void handle(Socket client) throws IOException {
+        BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+        OutputStream out = client.getOutputStream();
+
+        String requestLine = in.readLine();
+        if (requestLine == null || requestLine.isEmpty()) return;
+        String[] parts = requestLine.split(" ");
+        String method = parts[0];
+        String rawPath = parts[1];
+
+        // ignorar headers
+        while ((in.readLine()) != null && !in.ready()) {}
+
+        Request req = new Request(method, rawPath);
+        Response res = new Response();
+
+        // 1) si hay ruta definida
+        Route route = getRoutes.get(req.path());
+        if (route != null) {
+            try {
+                String body = route.handle(req, res);
+                sendText(out, res.status, res.type, body);
+            } catch(Exception e) {
+                sendText(out, 500, "text/plain", "Error: "+e.getMessage());
+            }
             return;
         }
 
-        System.out.println("Solicitud: " + inputLine);
-        String[] requestParts = inputLine.split(" ");
-        String method = requestParts[0];
-        String path = requestParts[1];
-
-        while ((in.readLine()) != null && !in.ready()) {
+        // 2) endpoint especial de tareas
+        if (req.path().startsWith("/tasks")) {
+            handleTasks(out, method, req);
+            return;
         }
 
-        if (path.startsWith("/tasks")) {
-            handleTasks(out, method, path);
-        } else {
-            serveStaticFile(out, path);
-        }
+        // 3) servir estáticos
+        serveStatic(out, rawPath);
+    }
+     
+     private static void serveStatic(OutputStream out, String rawPath) throws IOException {
+    // Si no hay ruta ("/"), devolver index.html
+    String path = rawPath.equals("/") ? "/index.html" : rawPath;
 
-        in.close();
-        out.close();
+    File file = new File(staticDir + path);
+    if (file.exists() && file.isFile()) {
+        byte[] data = Files.readAllBytes(file.toPath());
+        sendBinary(out, 200, guessContentType(path), data);
+    } else {
+        sendText(out, 404, "text/plain", "404 Not Found: " + path);
+    }
     }
 
-    private static void handleTasks(OutputStream out, String method, String path) throws IOException {
-        Map<String, String> params = getParams(path);
-        String name = params.getOrDefault("name", "Anon");
-        String type = params.getOrDefault("type", "otro"); // ahora usamos "type"
-
-        switch (method.toUpperCase()) {
+    private static void handleTasks(OutputStream out, String method, Request req) throws IOException {
+        String name = req.getValues("name");
+        String type = req.getValues("type");
+        switch(method) {
             case "GET":
-                sendResponse(out, "application/json", gson.toJson(tasks));
+                sendText(out, 200, "application/json", gson.toJson(tasks));
                 break;
-
             case "POST":
-                if (!name.equals("Anon")) {
-                    Map<String, String> task = new HashMap<>();
-                    task.put("name", name);
-                    task.put("type", type); // guardamos tipo
-                    tasks.add(task);
-                    sendResponse(out, "text/plain", "Tarea agregada: " + name + " (" + type + ")");
+                if (!name.isEmpty()) {
+                    Map<String,String> t = new HashMap<>();
+                    t.put("name", name);
+                    t.put("type", type.isEmpty()?"otro":type);
+                    tasks.add(t);
+                    sendText(out, 200, "text/plain", "Tarea agregada: "+name);
                 } else {
-                    sendResponse(out, "text/plain", "Tarea inválida.");
+                    sendText(out, 400, "text/plain", "Nombre requerido");
                 }
                 break;
-
             case "DELETE":
-                boolean removed = tasks.removeIf(t
-                        -> t.get("name").equals(name) && t.get("type").equals(type)
-                );
-                if (removed) {
-                    sendResponse(out, "text/plain", "Tarea eliminada: " + name + " (" + type + ")");
-                } else {
-                    sendResponse(out, "text/plain", "Tarea no encontrada: " + name);
-                }
+                boolean removed = tasks.removeIf(t -> t.get("name").equals(name) && t.get("type").equals(type));
+                sendText(out, 200, "text/plain", removed?"Tarea eliminada":"No encontrada");
                 break;
-                
             case "RESET":
                 tasks.clear();
-                sendResponse(out, "text/plain", "Lista reiniciada");
+                sendText(out, 200, "text/plain", "Lista reiniciada");
                 break;
-
             default:
-                sendResponse(out, "text/plain", "Método no soportado: " + method);
+                sendText(out, 405, "text/plain", "Método no soportado");
         }
     }
 
-    private static Map<String, String> getParams(String path) {
-        Map<String, String> params = new HashMap<>();
-        if (path.contains("?")) {
-            String query = path.split("\\?")[1];
-            for (String pair : query.split("&")) {
-                String[] kv = pair.split("=");
-                if (kv.length == 2) {
-                    params.put(kv[0], URLDecoder.decode(kv[1], java.nio.charset.StandardCharsets.UTF_8));
-                }
-            }
-        }
-        return params;
+    private static void sendText(OutputStream out, int status, String type, String body) throws IOException {
+        byte[] data = body.getBytes(StandardCharsets.UTF_8);
+        String headers = "HTTP/1.1 "+status+" OK\r\n"+
+                         "Content-Type: "+type+"; charset=utf-8\r\n"+
+                         "Content-Length: "+data.length+"\r\n\r\n";
+        out.write(headers.getBytes());
+        out.write(data);
     }
 
-    private static void serveStaticFile(OutputStream out, String path) throws IOException {
-        if (path.equals("/")) {
-            path = "/index.html";
-        }
-        File file = new File("public" + path);
-        if (file.exists() && !file.isDirectory()) {
-            String contentType = guessContentType(file.getName());
-            byte[] fileBytes = Files.readAllBytes(file.toPath());
-            sendBinaryResponse(out, contentType, fileBytes);
-        } else {
-            sendResponse(out, "text/plain", "404 Not Found");
-        }
+      private static void sendBinary(OutputStream out, int status, String type, byte[] data) throws IOException {
+        String headers = "HTTP/1.1 "+status+" OK\r\n"+
+                         "Content-Type: "+type+"\r\n"+
+                         "Content-Length: "+data.length+"\r\n\r\n";
+        out.write(headers.getBytes());
+        out.write(data);
     }
 
-    private static String guessContentType(String fileName) {
-        Map<String, String> mimeTypes = new HashMap<>();
-        mimeTypes.put("html", "text/html");
-        mimeTypes.put("css", "text/css");
-        mimeTypes.put("js", "application/javascript");
-        mimeTypes.put("png", "image/png");
-        mimeTypes.put("jpg", "image/jpeg");
-        return mimeTypes.getOrDefault(fileName.substring(fileName.lastIndexOf(".") + 1), "application/octet-stream");
+     private static String guessContentType(String name) {
+        if (name.endsWith(".html")) return "text/html";
+        if (name.endsWith(".css")) return "text/css";
+        if (name.endsWith(".js")) return "application/javascript";
+        if (name.endsWith(".png")) return "image/png";
+        if (name.endsWith(".jpg")) return "image/jpeg";
+        return "application/octet-stream";
     }
 
     private static void sendResponse(OutputStream out, String contentType, String content) throws IOException {
@@ -140,12 +162,4 @@ public class HttpServer {
         out.write(response.getBytes());
     }
 
-    private static void sendBinaryResponse(OutputStream out, String contentType, byte[] content) throws IOException {
-        String headers = "HTTP/1.1 200 OK\r\n"
-                + "Content-Type: " + contentType + "\r\n"
-                + "Content-Length: " + content.length + "\r\n"
-                + "\r\n";
-        out.write(headers.getBytes());
-        out.write(content);
-    }
 }
