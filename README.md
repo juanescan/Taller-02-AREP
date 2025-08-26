@@ -18,8 +18,8 @@ El framework ofrece:
 
 1. Clona este repositorio o descarga los archivos:  
    ```bash
-   git clone https://github.com/juanescan/Taller-01-AREP.git
-   cd Taller-01-AREP
+   git clone https://github.com/juanescan/Taller-02-AREP.git
+   cd Taller-02-AREP
 2. Compila el proyecto con Maven:
    ```bash
    mvn clean install
@@ -30,6 +30,25 @@ El framework ofrece:
  El servidor se ejecutará en el puerto 8080:
  
  👉 http://localhost:8080
+
+ ## Características Principales
+
+ - Servidor HTTP en Java puro: desarrollado sin frameworks externos, usando únicamente ServerSocket.
+ 
+ - Soporte para archivos estáticos: sirve páginas HTML, estilos CSS, scripts JavaScript e imágenes desde la carpeta pública del proyecto.
+
+ - Servicios REST ligeros: permite definir rutas para exponer datos y manejar solicitudes desde el frontend.
+
+ - Manejo de parámetros: extracción de valores enviados en la URL (query params) para procesar las peticiones.
+
+ - Gestión de tareas en memoria: el servidor mantiene un arreglo JSON con las tareas activas durante la ejecución.
+
+ - Operaciones CRUD básicas: agregar, listar y eliminar tareas a través de la API REST.
+
+ - Comunicación asíncrona: el frontend usa fetch() para interactuar dinámicamente con el backend sin recargar la página.
+
+ - Arquitectura modular y extensible: fácil de ampliar con nuevas rutas REST o nuevos recursos estáticos. 
+
 
  ## 🏗️ Arquitectura
 
